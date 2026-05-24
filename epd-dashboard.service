@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/home/tiago/.local/bin/uv run --with /home/tiago/epd-dashboard epd-dashboard
+ExecStart=/home/tiago/.local/bin/uv run --with /home/tiago/epd-dashboard dashboard
 WorkingDirectory=/home/tiago/epd-dashboard
 Environment=HOME=/home/tiago
 Restart=on-failure

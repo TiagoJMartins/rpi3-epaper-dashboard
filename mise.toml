@@ -10,9 +10,8 @@ run = "uv run pyinfra -y rpi3 deploy.py"
 
 [tasks.sync]
 description = "Sync project to Pi (watcher auto-restarts)"
-run = """
-rsync -av --exclude '__pycache__' --exclude '.venv' --exclude 'dist' --exclude '*.egg-info' --exclude 'pyinfra-debug.log' . rpi3:~/epd-dashboard/
-"""
+run = "rsync -av --exclude '__pycache__' --exclude '.venv' --exclude 'dist' --exclude '*.egg-info' --exclude '.git' --exclude 'pyinfra-debug.log' . rpi3:~/epd-dashboard/"
+run_windows = 'rclone sync . :sftp,host=rpi3:/home/tiago/epd-dashboard --exclude "__pycache__/**" --exclude ".venv/**" --exclude "dist/**" --exclude "*.egg-info/**" --exclude ".git/**" --exclude "pyinfra-debug.log" -v'
 
 [tasks.logs]
 description = "Tail dashboard logs on Pi"

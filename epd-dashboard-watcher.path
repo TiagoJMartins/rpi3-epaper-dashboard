@@ -2,8 +2,8 @@
 Description=Watch epd-dashboard for changes
 
 [Path]
-PathModified=/home/tiago/epd-dashboard/src/epd_dashboard/dashboard.py
-PathModified=/home/tiago/epd-dashboard/src/epd_dashboard/epd.py
+PathModified=/home/tiago/epd-dashboard/src/dashboard/dashboard.py
+PathModified=/home/tiago/epd-dashboard/src/dashboard/epd.py
 Unit=epd-dashboard-watcher.service
 
 [Install]

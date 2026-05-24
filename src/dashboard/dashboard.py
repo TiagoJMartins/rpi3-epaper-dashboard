@@ -34,7 +34,7 @@ from urllib.error import URLError
 
 import yaml
 from PIL import Image, ImageDraw
-from epd_dashboard.epd import (Canvas, Row, Col, Text, Section, Grid, StatusDot, HeaderBar,
+from dashboard.epd import (Canvas, Row, Col, Text, Section, Grid, StatusDot, HeaderBar,
                                Table, Card, KV, Sep, Spacer, ProgressBar, Padded, Icon, font,
                                FONT_SM, FONT_MD, FONT_LG, PAD, Node)
 
