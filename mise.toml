@@ -1,0 +1,31 @@
+[tools]
+python = "3.13"
+
+[env]
+_.python.venv = { path = ".venv" }
+
+[tasks.deploy]
+description = "Provision and deploy dashboard to Pi"
+run = "uv run pyinfra -y rpi3 deploy.py"
+
+[tasks.sync]
+description = "Sync project to Pi (watcher auto-restarts)"
+run = """
+rsync -av --exclude '__pycache__' --exclude '.venv' --exclude 'dist' --exclude '*.egg-info' --exclude 'pyinfra-debug.log' . rpi3:~/epd-dashboard/
+"""
+
+[tasks.logs]
+description = "Tail dashboard logs on Pi"
+run = "ssh rpi3 'sudo journalctl -u epd-dashboard -f'"
+
+[tasks.restart]
+description = "Restart dashboard on Pi"
+run = "ssh rpi3 'sudo systemctl restart epd-dashboard'"
+
+[tasks.stop]
+description = "Stop dashboard on Pi"
+run = "ssh rpi3 'sudo systemctl stop epd-dashboard'"
+
+[tasks.status]
+description = "Dashboard service status"
+run = "ssh rpi3 'sudo systemctl status epd-dashboard'"

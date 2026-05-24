@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch epd-dashboard for changes
+
+[Path]
+PathModified=/home/tiago/epd-dashboard/src/epd_dashboard/dashboard.py
+PathModified=/home/tiago/epd-dashboard/src/epd_dashboard/epd.py
+Unit=epd-dashboard-watcher.service
+
+[Install]
+WantedBy=multi-user.target

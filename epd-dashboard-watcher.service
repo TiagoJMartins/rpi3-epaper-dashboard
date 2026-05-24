@@ -1,0 +1,6 @@
+[Unit]
+Description=Restart e-Paper dashboard after file change
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl restart epd-dashboard.service

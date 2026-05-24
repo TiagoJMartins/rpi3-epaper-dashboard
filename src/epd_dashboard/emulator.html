@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EPD Emulator</title>
+<style>
+  :root { --scale: 3; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: #1a1a1e; color: #ccc;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    gap: 16px;
+  }
+  h1 { font-size: 14px; font-weight: 500; color: #888; letter-spacing: 0.5px; text-transform: uppercase; }
+
+  .hat {
+    background: #1a6b3c; border-radius: 8px; padding: 20px 24px;
+    display: flex; gap: 16px; align-items: center;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    position: relative;
+  }
+  .hat::before {
+    content: 'Waveshare 2.7" e-Paper HAT V2';
+    position: absolute; top: 5px; left: 24px;
+    font-size: 8px; color: rgba(255,255,255,0.25); letter-spacing: 0.5px; text-transform: uppercase;
+  }
+
+  .display-bezel {
+    background: #333; border: 2px solid #8a8680; border-radius: 4px; padding: 6px;
+  }
+  #frame {
+    width: calc(264px * var(--scale)); height: calc(176px * var(--scale));
+    image-rendering: pixelated;
+    background: #e8e4d9;
+    display: block;
+  }
+
+  .buttons { display: flex; flex-direction: column; gap: 8px; }
+  .btn-hw {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.15); background: #222; color: #aaa;
+    font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.1s;
+    display: flex; align-items: center; justify-content: center;
+    user-select: none; position: relative;
+  }
+  .btn-hw:hover { background: #333; border-color: rgba(255,255,255,0.3); }
+  .btn-hw:active, .btn-hw.active { background: #444; border-color: #6a6; transform: scale(0.93); }
+  .btn-hw .label {
+    position: absolute; left: 48px; white-space: nowrap;
+    font-size: 10px; color: rgba(255,255,255,0.2); font-weight: 400; pointer-events: none;
+  }
+
+  .controls { display: flex; gap: 12px; align-items: center; font-size: 12px; }
+  .status { font-size: 11px; color: #666; display: flex; gap: 16px; }
+  .ok { color: #6a6; } .err { color: #a66; }
+
+  .push-form { display: flex; gap: 8px; align-items: center; font-size: 12px; }
+  .push-form input {
+    background: #2a2a2e; border: 1px solid #444; color: #ccc;
+    padding: 4px 8px; border-radius: 4px; font-size: 12px; font-family: monospace;
+  }
+  .push-form input[name="title"] { width: 120px; }
+  .push-form input[name="body"] { width: 200px; }
+  .push-form button {
+    background: #2a2a2e; border: 1px solid #444; color: #ccc;
+    padding: 4px 12px; border-radius: 4px; font-size: 12px; cursor: pointer;
+  }
+  .push-form button:hover { background: #3a3a3e; }
+
+  .hints { font-size: 10px; color: #555; text-align: center; line-height: 1.6; }
+  kbd {
+    background: #2a2a2e; border: 1px solid #444; border-radius: 3px;
+    padding: 1px 5px; font-size: 10px; font-family: monospace; color: #999;
+  }
+</style>
+</head>
+<body>
+
+<h1>EPD Emulator</h1>
+
+<div class="hat">
+  <div class="display-bezel">
+    <img id="frame" alt="" width="264" height="176">
+  </div>
+  <div class="buttons">
+    <button class="btn-hw" data-key="0">K1<span class="label">◀ Prev</span></button>
+    <button class="btn-hw" data-key="1">K2<span class="label">Next ▶</span></button>
+    <button class="btn-hw" data-key="2">K3<span class="label">Action</span></button>
+    <button class="btn-hw" data-key="3">K4<span class="label">Dark / ⟳</span></button>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="status">
+    <span id="conn">—</span>
+    <span id="page-info">—</span>
+  </div>
+</div>
+
+<div class="push-form">
+  <input name="title" placeholder="Título" id="push-title">
+  <input name="body" placeholder="Corpo" id="push-body">
+  <button id="push-btn">Enviar</button>
+  <button id="clear-btn">Limpar</button>
+</div>
+
+<div class="hints">
+  <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> = botões &nbsp;
+  Segurar vários = combo &nbsp;
+  Clique direito K4 = pressão longa
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const frameImg = $('#frame');
+const connEl = $('#conn');
+const pageEl = $('#page-info');
+
+let connected = false;
+let frameBusy = false;
+let statusBusy = false;
+
+async function pollFrame() {
+  if (frameBusy) return;
+  frameBusy = true;
+  try {
+    const resp = await fetch('/frame', { cache: 'no-store' });
+    if (!resp.ok) return;
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const old = frameImg.src;
+    frameImg.src = url;
+    if (old.startsWith('blob:')) URL.revokeObjectURL(old);
+    if (!connected) { connected = true; connEl.textContent = '● conectado'; connEl.className = 'ok'; }
+  } catch {
+    if (connected) { connected = false; connEl.textContent = '○ desconectado'; connEl.className = 'err'; }
+  } finally { frameBusy = false; }
+}
+
+async function pollStatus() {
+  if (statusBusy) return;
+  statusBusy = true;
+  try {
+    const resp = await fetch('/status');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const pages = data.pages || [];
+    const idx = data.current_page ?? 0;
+    pageEl.textContent = `${pages[idx] || '?'} (${idx + 1}/${pages.length})`;
+    if (!connected) { connected = true; connEl.textContent = '● conectado'; connEl.className = 'ok'; }
+  } catch {}
+  finally { statusBusy = false; }
+}
+
+let timer;
+function startPolling() {
+  clearInterval(timer);
+  pollFrame(); pollStatus();
+  timer = setInterval(() => { pollFrame(); pollStatus(); }, 500);
+}
+startPolling();
+
+// ── Buttons ──
+async function sendButtons(keys) {
+  try {
+    await fetch('/buttons', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keys }),
+    });
+    pollFrame();
+    pollStatus();
+  } catch (e) { console.error('Button send failed:', e); }
+}
+
+function flash(btn, ms = 150) {
+  btn.classList.add('active');
+  setTimeout(() => btn.classList.remove('active'), ms);
+}
+
+document.querySelectorAll('.btn-hw').forEach(btn => {
+  const key = parseInt(btn.dataset.key);
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+    sendButtons([{ key, action: 'press' }]);
+    flash(btn);
+  });
+  btn.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    if (key === 3) {
+      sendButtons([{ key, action: 'long_press' }]);
+      flash(btn, 400);
+    }
+  });
+});
+
+// Keyboard: hold 1-4, release fires all held as combo
+const held = new Set();
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (!['1','2','3','4'].includes(e.key) || held.has(e.key)) return;
+  held.add(e.key);
+  e.preventDefault();
+  const btn = document.querySelector(`.btn-hw[data-key="${parseInt(e.key) - 1}"]`);
+  if (btn) btn.classList.add('active');
+});
+
+document.addEventListener('keyup', e => {
+  if (e.target.tagName === 'INPUT' || !held.has(e.key)) return;
+  held.delete(e.key);
+  setTimeout(() => {
+    if (held.size > 0) return;
+    const btns = document.querySelectorAll('.btn-hw.active');
+    const keys = [...btns].map(b => ({
+      key: parseInt(b.dataset.key),
+      action: (e.shiftKey && b.dataset.key === '3') ? 'long_press' : 'press',
+    }));
+    btns.forEach(b => b.classList.remove('active'));
+    if (keys.length) sendButtons(keys);
+  }, 60);
+});
+
+// ── Push / Clear ──
+$('#push-btn').addEventListener('click', async () => {
+  const title = $('#push-title').value.trim();
+  if (!title) return;
+  await fetch('/push', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, body: $('#push-body').value.trim(), priority: 3 }),
+  }).catch(() => {});
+  $('#push-title').value = '';
+  $('#push-body').value = '';
+  setTimeout(pollFrame, 200);
+});
+
+$('#clear-btn').addEventListener('click', async () => {
+  await fetch('/clear', { method: 'POST' }).catch(() => {});
+  setTimeout(pollFrame, 200);
+});
+
+$('#push-title').addEventListener('keydown', e => { if (e.key === 'Enter') $('#push-btn').click(); });
+$('#push-body').addEventListener('keydown', e => { if (e.key === 'Enter') $('#push-btn').click(); });
+</script>
+</body>
+</html>

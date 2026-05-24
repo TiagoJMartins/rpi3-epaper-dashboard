@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+dist/
+*.egg-info/
+pyinfra-debug.log
+font_test_nerd.png

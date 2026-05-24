@@ -1,0 +1,15 @@
+[Unit]
+Description=E-Paper Widget Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/tiago/.local/bin/uv run --with /home/tiago/epd-dashboard epd-dashboard
+WorkingDirectory=/home/tiago/epd-dashboard
+Environment=HOME=/home/tiago
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
