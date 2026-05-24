@@ -64,9 +64,9 @@ for ttf in Path("fonts").glob("*.ttf"):
 
 # ── Systemd units ──────────────────────────────────────────────────
 units = [
-    "epd-dashboard.service",
-    "epd-dashboard-watcher.path",
-    "epd-dashboard-watcher.service",
+    "dashboard.service",
+    "dashboard-watcher.path",
+    "dashboard-watcher.service",
 ]
 units_changed = False
 
@@ -90,7 +90,7 @@ if units_changed:
 
 systemd.service(
     name="Enable and start dashboard",
-    service="epd-dashboard.service",
+    service="dashboard.service",
     running=True,
     enabled=True,
     restarted=True,
@@ -99,7 +99,7 @@ systemd.service(
 
 systemd.service(
     name="Enable file watcher",
-    service="epd-dashboard-watcher.path",
+    service="dashboard-watcher.path",
     running=True,
     enabled=True,
     _sudo=True,

@@ -1,10 +1,10 @@
 """E-Paper Widget Dashboard — Waveshare 2.7" V2 HAT (264×176) on Raspberry Pi 3B+.
 
 Homepage-style configurable widget dashboard for e-paper display.
-Define pages and widgets in ~/.epd-dashboard/config.yaml.
+Define pages and widgets in ~/.dashboard/config.yaml.
 
 Usage:
-    uv run dashboard.py [--port 8080] [--mock] [--data-dir ~/.epd-dashboard]
+    dashboard [--port 8080] [--mock] [--data-dir ~/.dashboard]
 
 API:
     curl -X POST http://rpi3:8080/push -H 'Content-Type: application/json' \
@@ -1122,7 +1122,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="E-Paper Widget Dashboard")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--mock", action="store_true", help="Save PNGs instead of driving display")
-    parser.add_argument("--data-dir", type=Path, default=Path.home() / ".epd-dashboard")
+    parser.add_argument("--data-dir", type=Path, default=Path.home() / ".dashboard")
     parser.add_argument("--config", type=Path, default=None, help="Config YAML path")
     args = parser.parse_args()
 
