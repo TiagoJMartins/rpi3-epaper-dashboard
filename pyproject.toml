@@ -6,10 +6,9 @@ requires-python = ">=3.11"
 dependencies = [
     "pillow",
     "pyyaml",
+    "spidev; platform_machine == 'aarch64' or platform_machine == 'armv7l'",
+    "lgpio; platform_machine == 'aarch64' or platform_machine == 'armv7l'",
 ]
-
-[project.optional-dependencies]
-pi = ["spidev", "lgpio"]
 
 [project.scripts]
 dashboard = "dashboard.dashboard:main"

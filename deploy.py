@@ -3,14 +3,16 @@
 # requires-python = ">=3.11"
 # dependencies = ["pyinfra"]
 # ///
-"""Provision and deploy e-Paper dashboard to Raspberry Pi.
+"""Provision Raspberry Pi for the e-Paper dashboard.
+
+Installs system deps, uv, fonts, systemd service.
+The service runs via uvx from the GitHub repo — no local file sync needed.
 
 Usage:
-    uv run deploy.py
+    uv run pyinfra rpi3 deploy.py
 """
 from pathlib import Path
 
-from pyinfra import host
 from pyinfra.operations import apt, files, server, systemd
 
 # ── System deps ────────────────────────────────────────────────────
@@ -37,15 +39,7 @@ server.shell(
     _sudo=True,
 )
 
-# ── Dashboard files ────────────────────────────────────────────────
-files.put(
-    name="Upload dashboard.py",
-    src="dashboard.py",
-    dest="/home/tiago/dashboard.py",
-    user="tiago",
-    group="tiago",
-)
-
+# ── Fonts ──────────────────────────────────────────────────────────
 files.directory(
     name="Create fonts directory",
     path="/home/tiago/fonts",
@@ -62,27 +56,18 @@ for ttf in Path("fonts").glob("*.ttf"):
         group="tiago",
     )
 
-# ── Systemd units ──────────────────────────────────────────────────
-units = [
-    "dashboard.service",
-    "dashboard-watcher.path",
-    "dashboard-watcher.service",
-]
-units_changed = False
+# ── Systemd service ───────────────────────────────────────────────
+result = files.put(
+    name="Install dashboard.service",
+    src="dashboard.service",
+    dest="/etc/systemd/system/dashboard.service",
+    user="root",
+    group="root",
+    mode="644",
+    _sudo=True,
+)
 
-for unit in units:
-    result = files.put(
-        name=f"Install {unit}",
-        src=unit,
-        dest=f"/etc/systemd/system/{unit}",
-        user="root",
-        group="root",
-        mode="644",
-        _sudo=True,
-    )
-    units_changed = units_changed or result.changed
-
-if units_changed:
+if result.changed:
     systemd.daemon_reload(
         name="Reload systemd",
         _sudo=True,
@@ -94,13 +79,5 @@ systemd.service(
     running=True,
     enabled=True,
     restarted=True,
-    _sudo=True,
-)
-
-systemd.service(
-    name="Enable file watcher",
-    service="dashboard-watcher.path",
-    running=True,
-    enabled=True,
     _sudo=True,
 )

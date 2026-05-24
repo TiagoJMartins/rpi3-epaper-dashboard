@@ -8,11 +8,13 @@ _.python.venv = { path = ".venv" }
 description = "Provision and deploy dashboard to Pi"
 run = "uv run pyinfra -y rpi3 deploy.py"
 
-[tasks.sync]
-description = "Sync project to Pi (watcher auto-restarts)"
-run = "rsync -av --exclude '__pycache__' --exclude '.venv' --exclude 'dist' --exclude '*.egg-info' --exclude '.git' --exclude 'pyinfra-debug.log' . rpi3:~/dashboard/"
-run_windows = 'rclone sync . :sftp,host=rpi3:/home/tiago/dashboard --exclude "__pycache__/**" --exclude ".venv/**" --exclude "dist/**" --exclude "*.egg-info/**" --exclude ".git/**" --exclude "pyinfra-debug.log" -v'
 
+[tasks.upgrade]
+description = "Push to git and restart dashboard on Pi (pulls latest)"
+run = """
+git push
+ssh rpi3 'sudo systemctl restart dashboard'
+"""
 [tasks.logs]
 description = "Tail dashboard logs on Pi"
 run = "ssh rpi3 'sudo journalctl -u dashboard -f'"
