@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/home/tiago/.local/bin/uvx --from git+ssh://git@github.com/TiagoJMartins/rpi3-epaper-dashboard dashboard
+ExecStart=/home/tiago/.local/bin/uvx --from git+https://github.com/TiagoJMartins/rpi3-epaper-dashboard dashboard
 Environment=HOME=/home/tiago
 Restart=on-failure
 RestartSec=5
