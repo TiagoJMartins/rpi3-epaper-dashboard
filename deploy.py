@@ -81,3 +81,10 @@ systemd.service(
     restarted=True,
     _sudo=True,
 )
+
+# ── Tailscale Serve (HTTPS proxy → localhost:8080) ────────────────
+server.shell(
+    name="Configure Tailscale Serve for HTTPS",
+    commands=["tailscale serve --bg --https=443 http://localhost:8080"],
+    _sudo=True,
+)
