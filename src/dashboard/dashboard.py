@@ -199,59 +199,99 @@ class Handler(BaseHTTPRequestHandler):
             self._json(404, {"error": "not found"})
 
     def do_POST(self) -> None:
-        if self.path == "/push":
-            try:
-                data = json.loads(self._read_body())
-                n = Notification(
-                    title=data["title"],
-                    body=data.get("body", ""),
-                    priority=data.get("priority", 3),
-                )
-                self._store.push(n)
-                self._push_event.set()
-                log.info("← %s", n.title)
-                self._json(200, {"ok": True})
-            except (json.JSONDecodeError, KeyError) as e:
-                self._json(400, {"error": str(e)})
-        elif self.path == "/clear":
+        if self.path == "/clear":
             self._store.clear()
             self._push_event.set()
             self._json(200, {"ok": True})
         elif self.path == "/buttons":
-            epd = self._epd
-            if not isinstance(epd, MockEPD):
-                self._json(400, {"error": "buttons only available in mock mode"})
-                return
-            try:
-                data = json.loads(self._read_body())
-                keys = data.get("keys", [])
-                if not isinstance(keys, list) or not keys:
-                    raise ValueError("keys required")
-                for entry in keys:
-                    if isinstance(entry, int):
-                        if not (0 <= entry <= 3):
-                            raise ValueError(f"key {entry} out of range 0-3")
-                        epd.press_key(entry, hold_cycles=1)
-                    elif isinstance(entry, dict):
-                        k = entry["key"]
-                        action = entry.get("action", "press")
-                        if not (isinstance(k, int) and 0 <= k <= 3):
-                            raise ValueError(f"key {k} out of range 0-3")
-                        if action == "press":
-                            epd.press_key(k, hold_cycles=1)
-                        elif action == "long_press":
-                            epd.press_key(k, hold_cycles=30)
-                        else:
-                            raise ValueError(f"unknown action: {action}")
-                    else:
-                        raise ValueError("each key must be int or {key, action}")
-            except (json.JSONDecodeError, ValueError, KeyError) as e:
-                self._json(400, {"error": str(e)})
-                return
-            self._push_event.set()
-            self._json(200, {"ok": True})
+            self._handle_buttons()
         else:
-            self._json(404, {"error": "not found"})
+            self._handle_notify()
+
+    def _handle_notify(self) -> None:
+        """ntfy-style notification: plain text, JSON, or headers all work.
+
+        Examples:
+            curl rpi3 -d "hello"
+            curl rpi3 -H "Title: alert" -d "details here"
+            curl rpi3 -H "Priority: 5" -d "urgent"
+            curl rpi3 -d '{"title":"hello","body":"details","priority":3}'
+        """
+        raw = self._read_body()
+        ct = self.headers.get("Content-Type", "")
+        title = ""
+        body = ""
+        priority = 3
+
+        if "json" in ct:
+            try:
+                data = json.loads(raw)
+                title = data.get("title", "")
+                body = data.get("body", "")
+                priority = data.get("priority", 3)
+            except (json.JSONDecodeError, AttributeError):
+                self._json(400, {"error": "invalid JSON"})
+                return
+        else:
+            text = raw.decode("utf-8", errors="replace").strip()
+            # ntfy-style headers override body text
+            title = self.headers.get("Title", self.headers.get("X-Title", ""))
+            if title:
+                body = text
+            else:
+                title = text
+
+        # Priority from header overrides body/JSON
+        hdr_pri = self.headers.get("Priority", self.headers.get("X-Priority", ""))
+        if hdr_pri:
+            try:
+                priority = int(hdr_pri)
+            except ValueError:
+                pass
+
+        if not title:
+            self._json(400, {"error": "empty notification"})
+            return
+
+        n = Notification(title=title, body=body, priority=priority)
+        self._store.push(n)
+        self._push_event.set()
+        log.info("← %s", n.title)
+        self._json(200, {"ok": True})
+
+    def _handle_buttons(self) -> None:
+        epd = self._epd
+        if not isinstance(epd, MockEPD):
+            self._json(400, {"error": "buttons only available in mock mode"})
+            return
+        try:
+            data = json.loads(self._read_body())
+            keys = data.get("keys", [])
+            if not isinstance(keys, list) or not keys:
+                raise ValueError("keys required")
+            for entry in keys:
+                if isinstance(entry, int):
+                    if not (0 <= entry <= 3):
+                        raise ValueError(f"key {entry} out of range 0-3")
+                    epd.press_key(entry, hold_cycles=1)
+                elif isinstance(entry, dict):
+                    k = entry["key"]
+                    action = entry.get("action", "press")
+                    if not (isinstance(k, int) and 0 <= k <= 3):
+                        raise ValueError(f"key {k} out of range 0-3")
+                    if action == "press":
+                        epd.press_key(k, hold_cycles=1)
+                    elif action == "long_press":
+                        epd.press_key(k, hold_cycles=30)
+                    else:
+                        raise ValueError(f"unknown action: {action}")
+                else:
+                    raise ValueError("each key must be int or {key, action}")
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            self._json(400, {"error": str(e)})
+            return
+        self._push_event.set()
+        self._json(200, {"ok": True})
 
 
 # ── Main ──────────────────────────────────────────────────────────

@@ -188,6 +188,21 @@ def _post(url: str, body: dict) -> tuple[int, dict]:
         return code, json.loads(body_bytes) if body_bytes else {}
 
 
+
+def _post_text(url: str, text: str, headers: dict[str, str] | None = None) -> tuple[int, dict]:
+    data = text.encode()
+    hdrs = {"Content-Type": "text/plain"}
+    if headers:
+        hdrs.update(headers)
+    req = Request(url, data=data, headers=hdrs)
+    try:
+        with urlopen(req, timeout=5) as resp:
+            return resp.status, json.loads(resp.read())
+    except Exception as e:
+        code = getattr(e, 'code', 0)
+        body_bytes = getattr(e, 'read', lambda: b'{}')()
+        return code, json.loads(body_bytes) if body_bytes else {}
+
 class TestHandlerStatus:
     def test_status_endpoint(self, server_env):
         code, body = _get(f"{server_env.base_url}/status")
@@ -215,24 +230,50 @@ class TestHandlerStatus:
 
 
 class TestHandlerPush:
-    def test_push_notification(self, server_env):
-        code, data = _post(f"{server_env.base_url}/push", {"title": "Test"})
+    def test_plain_text_post(self, server_env):
+        """curl rpi3 -d 'hello' should just work."""
+        code, data = _post_text(f"{server_env.base_url}/", "hello")
         assert code == 200
         assert data["ok"] is True
         assert len(server_env.store.items) == 1
-        assert server_env.store.items[0].title == "Test"
+        assert server_env.store.items[0].title == "hello"
 
-    def test_push_with_body_and_priority(self, server_env):
-        code, data = _post(f"{server_env.base_url}/push", {
+    def test_plain_text_any_path(self, server_env):
+        """Any POST path creates a notification."""
+        code, data = _post_text(f"{server_env.base_url}/whatever", "test")
+        assert code == 200
+        assert server_env.store.items[0].title == "test"
+
+    def test_title_header_with_body(self, server_env):
+        code, data = _post_text(
+            f"{server_env.base_url}/", "details here",
+            headers={"Title": "Alert"},
+        )
+        assert code == 200
+        n = server_env.store.items[0]
+        assert n.title == "Alert"
+        assert n.body == "details here"
+
+    def test_priority_header(self, server_env):
+        code, data = _post_text(
+            f"{server_env.base_url}/", "urgent",
+            headers={"Priority": "5"},
+        )
+        assert code == 200
+        assert server_env.store.items[0].priority == 5
+
+    def test_json_post(self, server_env):
+        code, data = _post(f"{server_env.base_url}/", {
             "title": "Alert", "body": "Details", "priority": 5,
         })
         assert code == 200
         n = server_env.store.items[0]
+        assert n.title == "Alert"
         assert n.body == "Details"
         assert n.priority == 5
 
-    def test_push_missing_title(self, server_env):
-        code, data = _post(f"{server_env.base_url}/push", {"body": "no title"})
+    def test_empty_body_rejected(self, server_env):
+        code, data = _post_text(f"{server_env.base_url}/", "")
         assert code == 400
 
     def test_clear_notifications(self, server_env):
@@ -271,7 +312,7 @@ class TestHandlerButtons:
 
 class TestHandlerCors:
     def test_options_returns_cors_headers(self, server_env):
-        req = Request(f"{server_env.base_url}/push", method="OPTIONS")
+        req = Request(f"{server_env.base_url}/", method="OPTIONS")
         with urlopen(req, timeout=5) as resp:
             assert resp.status == 204
             assert resp.headers.get("Access-Control-Allow-Origin") == "*"
