@@ -34,20 +34,30 @@ class Display(Protocol):
     def close(self) -> None: ...
 
 
-def pack(img: Image.Image, invert: bool = False) -> bytes:
-    """Rotate 264×176 landscape → 176×264 portrait and pack to 1-bit."""
+def pack(img: Image.Image, portrait: bool = False) -> bytes:
+    """Pack a rendered image to EPD buffer.
+
+    landscape (default): img is 264×176, rotated 90° to 176×264 for EPD.
+    portrait: img is already 176×264, packed directly.
+    """
     buf = bytearray(b'\xff' * BUF_SIZE)
     pixels = img.convert("1").load()
-    for y in range(H):
-        for x in range(W):
-            if pixels[x, y] == 0:
-                newx = y
-                newy = EPD_H - 1 - x
-                idx = (newx + newy * EPD_W) // 8
-                buf[idx] &= ~(0x80 >> (newx % 8))
-    if invert:
-        for i in range(BUF_SIZE):
-            buf[i] ^= 0xFF
+    if portrait:
+        # Image is already 176×264 — pack row-major, no rotation
+        for y in range(EPD_H):
+            for x in range(EPD_W):
+                if pixels[x, y] == 0:
+                    idx = (x + y * EPD_W) // 8
+                    buf[idx] &= ~(0x80 >> (x % 8))
+    else:
+        # Rotate 264×176 landscape → 176×264 portrait
+        for y in range(H):
+            for x in range(W):
+                if pixels[x, y] == 0:
+                    newx = y
+                    newy = EPD_H - 1 - x
+                    idx = (newx + newy * EPD_W) // 8
+                    buf[idx] &= ~(0x80 >> (newx % 8))
     return bytes(buf)
 
 

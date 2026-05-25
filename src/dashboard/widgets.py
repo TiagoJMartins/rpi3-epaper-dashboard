@@ -6,6 +6,10 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from dashboard.data import Cache, check_service, fetch_grafana_alerts, fetch_json, prom_query
+from dashboard.personality import (
+    all_services_up, empty_notifications, empty_playing, greeting,
+    weather_quip,
+)
 from dashboard.epd import (
     Card, FONT_LG, FONT_MD, FONT_SM, Grid, HeaderBar, Icon, KV, Node,
     ProgressBar, Row, Section, Spacer, StatusDot, Table, Text,
@@ -51,7 +55,7 @@ class ClockWidget(Widget):
 
     def layout(self) -> Node:
         now = datetime.now()
-        left = f'{Icon.CLOCK} {now.strftime("%H:%M")}'
+        left = f'{greeting(now)} {now.strftime("%H:%M")}'
         date_str = f'{self._PT_DAYS[now.weekday()]} {now.day} {self._PT_MONTHS[now.month - 1]}'
         center = ''
         lat = self.cfg.get('latitude')
@@ -110,7 +114,9 @@ class WeatherWidget(Widget):
         for i in range(min(3, len(highs))):
             day_label = ['Hoje', 'Amanhã'][i] if i < 2 else daily.get('time', ['', '', ''])[i][5:]
             ic = Icon.wmo(codes[i]) if i < len(codes) else '?'
-            children.append(Text(f'{day_label}: {ic} {lows[i]:.0f}-{highs[i]:.0f}°C', size=FONT_MD))
+            quip = weather_quip(lows[i] if day_label == 'Hoje' else None, codes[i] if i < len(codes) else None)
+            suffix = f' {quip}' if quip and i == 0 else ''
+            children.append(Text(f'{day_label}: {ic} {lows[i]:.0f}-{highs[i]:.0f}°C{suffix}', size=FONT_MD))
         return Section(label, icon=Icon.SUN, children=children)
 
 
@@ -155,7 +161,10 @@ class ServicesWidget(Widget):
                 lambda u=url: check_service(u),
             )
             dots.append(StatusDot(name, up=status))
-        return Section(label, icon=Icon.SERVER, children=[Grid(cols=cols, row_h=14, items=dots)])
+        down_count = sum(1 for d in dots if isinstance(d, StatusDot) and not d.up)
+        badge = all_services_up() if down_count == 0 else ''
+        return Section(label, icon=Icon.SERVER, badge=badge,
+                       children=[Grid(cols=cols, row_h=14, items=dots)])
 
 
 # ── Notifications ─────────────────────────────────────────────────
@@ -168,7 +177,7 @@ class NotificationsWidget(Widget):
     def layout(self) -> Node:
         children: list[Node] = []
         if not self.store or not self.store.items:
-            children.append(Text('Sem notificações', size=FONT_MD))
+            children.append(Text(empty_notifications(), size=FONT_MD))
         else:
             for n in self.store.items[self.scroll:]:
                 marker = Icon.WARNING if n.priority >= 4 else Icon.CHEVRON
@@ -226,7 +235,7 @@ class NowPlayingWidget(Widget):
             sessions = resp.get('sessions', [])
         children: list[Node] = []
         if not sessions:
-            children.append(Text('Nada a reproduzir', size=FONT_SM))
+            children.append(Text(empty_playing(), size=FONT_SM))
         else:
             for s in sessions[:3]:
                 title = s.get('title', '?')

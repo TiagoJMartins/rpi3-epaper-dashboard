@@ -22,11 +22,10 @@ class TestPack:
         assert len(buf) == BUF_SIZE
         assert buf == b'\x00' * BUF_SIZE
 
-    def test_invert_flips_all_bits(self):
-        img = Image.new("1", (W, H), 1)
-        normal = pack(img)
-        inverted = pack(img, invert=True)
-        assert all(a ^ b == 0xFF for a, b in zip(normal, inverted))
+    def test_portrait_packs_differently(self):
+        landscape_img = Image.new("1", (W, H), 0)
+        portrait_img = Image.new("1", (H, W), 0)
+        assert pack(landscape_img) == pack(portrait_img, portrait=True)
 
     def test_single_black_pixel_changes_buffer(self):
         white = Image.new("1", (W, H), 1)

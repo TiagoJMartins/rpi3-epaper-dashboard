@@ -115,16 +115,17 @@ def _build_pages(cfg: dict, cache: Cache, store: Store) -> list[Page]:
 
 # ── Render ────────────────────────────────────────────────────────
 def render_page(page: Page, frame_buf: FrameBuffer,
-                store: Store | None = None, invert: bool = False) -> bytes:
+                store: Store | None = None, portrait: bool = False) -> bytes:
     """Render page to packed EPD buffer with optional toast overlay."""
     nodes = [w.layout() for w in page.widgets]
     toasts = build_toasts(store) if store and store.items else None
-    canvas = Canvas(W, H, nodes)
+    cw, ch = (H, W) if portrait else (W, H)
+    canvas = Canvas(cw, ch, nodes)
     img = canvas.render_with_overlays(toasts) if toasts else canvas.render()
     bio = BytesIO()
     img.save(bio, format='PNG')
     frame_buf.png = bio.getvalue()
-    return pack(img, invert)
+    return pack(img, portrait)
 
 
 # ── HTTP server ───────────────────────────────────────────────────
@@ -320,7 +321,7 @@ def main() -> None:  # pragma: no cover
 
     epd.init()
 
-    dark_mode = False
+    portrait = False
     key4_down_at: float | None = None
     key1_down_at: float | None = None
     LONG_PRESS = 1.0
@@ -376,14 +377,15 @@ def main() -> None:  # pragma: no cover
             log.info("Page: %s", pages[page_index[0]].name)
             need_redraw = True
 
-        # Key4: dark mode (tap) / force full refresh (hold)
+        # Key4: portrait/landscape (tap) / force full refresh (hold)
         if pressed[3]:
             key4_down_at = time.monotonic()
         if released[3] and key4_down_at is not None:
             if time.monotonic() - key4_down_at >= LONG_PRESS:
                 last_full = 0.0
             else:
-                dark_mode = not dark_mode
+                portrait = not portrait
+                log.info("Layout: %s", "portrait" if portrait else "landscape")
             key4_down_at = None
             need_redraw = True
 
@@ -398,7 +400,7 @@ def main() -> None:  # pragma: no cover
         if not need_redraw:
             continue
 
-        buf = render_page(pages[page_index[0]], frame_buf, store, dark_mode)
+        buf = render_page(pages[page_index[0]], frame_buf, store, portrait)
         last_render = time.monotonic()
         if now - last_full >= full_refresh_interval:
             epd.display_base(buf)

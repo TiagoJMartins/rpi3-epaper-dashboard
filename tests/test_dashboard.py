@@ -102,14 +102,14 @@ class TestRenderPage:
         render_page(page, fb)
         assert len(fb.png) > 0
 
-    def test_invert_mode(self, tmp_path):
+    def test_portrait_mode(self, tmp_path):
         cache = Cache()
         fb = FrameBuffer()
         w = ClockWidget({}, cache)
         page = Page(name="Test", widgets=[w])
-        normal = render_page(page, fb)
-        inverted = render_page(page, fb, invert=True)
-        assert normal != inverted
+        landscape = render_page(page, fb)
+        portrait = render_page(page, fb, portrait=True)
+        assert landscape != portrait
 
     def test_with_toasts(self, tmp_path):
         cache = Cache()
