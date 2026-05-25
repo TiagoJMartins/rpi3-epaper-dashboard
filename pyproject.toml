@@ -10,6 +10,27 @@ dependencies = [
     "lgpio; platform_machine == 'aarch64' or platform_machine == 'armv7l'",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["dashboard"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "if __name__",
+    "import lgpio",
+    "import spidev",
+    "pragma: no cover",
+]
+
 [project.scripts]
 dashboard = "dashboard.dashboard:main"
 
