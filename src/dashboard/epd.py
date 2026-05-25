@@ -127,6 +127,29 @@ def text_width(draw: ImageDraw.ImageDraw, text: str,
     return bbox[2] - bbox[0]
 
 
+
+def fit_text(draw: ImageDraw.ImageDraw, text: str,
+             f: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+             max_w: int) -> str:
+    """Truncate *text* with '…' so it fits within *max_w* pixels."""
+    if max_w <= 0:
+        return ''
+    tw = text_width(draw, text, f)
+    if tw <= max_w:
+        return text
+    ellipsis = '…'
+    ew = text_width(draw, ellipsis, f)
+    # Binary search for longest prefix that fits with ellipsis
+    lo, hi, best = 0, len(text), 0
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        if text_width(draw, text[:mid], f) + ew <= max_w:
+            best = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return text[:best] + ellipsis if best < len(text) else text
+
 # ── Default sizes ─────────────────────────────────────────────────
 FONT_SM = 11
 FONT_MD = 13
@@ -158,15 +181,16 @@ class Text(Node):
 
     def paint(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int) -> int:
         f = font(self.size, self.bold)
-        tw = text_width(draw, self.text, f)
+        t = fit_text(draw, self.text, f, w)
+        tw = text_width(draw, t, f)
         if self.align == "right":
             tx = x + w - tw
         elif self.align == "center":
             tx = x + (w - tw) // 2
         else:
             tx = x
-        draw.text((tx, y), self.text, font=f, fill=self.fill)
-        bbox = draw.textbbox((0, 0), self.text, font=f)
+        draw.text((tx, y), t, font=f, fill=self.fill)
+        bbox = draw.textbbox((0, 0), t, font=f)
         return bbox[3] - bbox[1] + 2  # text height + 2px breathing room
 
 
@@ -342,7 +366,13 @@ class Section(Node):
 
         cy = y + self.margin_top
         label = f"{self.icon} {self.title}" if self.icon else self.title
-        draw.text((x + PAD, cy), label, font=fb, fill=0)
+        inner = w - PAD * 2
+        if self.badge:
+            badge_w = text_width(draw, self.badge, f) + PAD
+            title_text = fit_text(draw, label, fb, inner - badge_w)
+        else:
+            title_text = fit_text(draw, label, fb, inner)
+        draw.text((x + PAD, cy), title_text, font=fb, fill=0)
 
         if self.badge:
             tw = text_width(draw, self.badge, f)
@@ -366,9 +396,13 @@ class KV(Node):
 
     def paint(self, draw: ImageDraw.ImageDraw, x: int, y: int, w: int) -> int:
         f = font(self.size)
+        kw = text_width(draw, self.key, f)
+        gap = 4
+        val_max = w - kw - gap
+        val_text = fit_text(draw, self.value, f, val_max)
         draw.text((x, y), self.key, font=f, fill=0)
-        tw = text_width(draw, self.value, f)
-        draw.text((x + w - tw, y), self.value, font=f, fill=0)
+        vw = text_width(draw, val_text, f)
+        draw.text((x + w - vw, y), val_text, font=f, fill=0)
         bbox = draw.textbbox((0, 0), self.key, font=f)
         return bbox[3] - bbox[1] + 2
 
@@ -389,8 +423,10 @@ class StatusDot(Node):
             dot = Icon.CHECK
         else:
             dot = Icon.WARNING
-        draw.text((x, y), f"{dot} {self.name}", font=f, fill=0)
-        bbox = draw.textbbox((0, 0), f"{dot} {self.name}", font=f)
+        full = f"{dot} {self.name}"
+        t = fit_text(draw, full, f, w)
+        draw.text((x, y), t, font=f, fill=0)
+        bbox = draw.textbbox((0, 0), t, font=f)
         return bbox[3] - bbox[1] + 2
 
 
@@ -409,11 +445,20 @@ class HeaderBar(Node):
         fb = font(FONT_LG, bold=True)
         f = font(FONT_MD)
 
+        # Measure right first, then allocate remaining to left, then center
+        rw = (text_width(draw, self.right, f) + PAD * 2) if self.right else 0
+        left_max = w - rw
         if self.left:
-            draw.text((x + PAD, y + 1), self.left, font=fb, fill=0)
+            lt = fit_text(draw, self.left, fb, left_max)
+            draw.text((x + PAD, y + 1), lt, font=fb, fill=0)
+            lw = text_width(draw, lt, fb) + PAD * 2
+        else:
+            lw = 0
         if self.center:
-            cw = text_width(draw, self.center, fb)
-            draw.text((x + (w - cw) // 2, y + 1), self.center, font=fb, fill=0)
+            center_max = w - lw - rw
+            ct = fit_text(draw, self.center, fb, center_max)
+            cw = text_width(draw, ct, fb)
+            draw.text((x + (w - cw) // 2, y + 1), ct, font=fb, fill=0)
         if self.right:
             tw = text_width(draw, self.right, f)
             draw.text((x + w - PAD - tw, y + 3), self.right, font=f, fill=0)

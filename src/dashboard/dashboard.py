@@ -117,7 +117,7 @@ def _build_pages(cfg: dict, cache: Cache, store: Store) -> list[Page]:
 def render_page(page: Page, frame_buf: FrameBuffer,
                 store: Store | None = None, portrait: bool = False) -> bytes:
     """Render page to packed EPD buffer with optional toast overlay."""
-    nodes = [w.layout(narrow=portrait) for w in page.widgets]
+    nodes = [w.layout() for w in page.widgets]
     toasts = build_toasts(store) if store and store.items else None
     cw, ch = (H, W) if portrait else (W, H)
     canvas = Canvas(cw, ch, nodes)

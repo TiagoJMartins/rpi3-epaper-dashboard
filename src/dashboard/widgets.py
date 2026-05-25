@@ -39,7 +39,7 @@ class Widget:
         self.cfg = cfg
         self.cache = cache
 
-    def layout(self, narrow: bool = False) -> Node:
+    def layout(self) -> Node:
         return Spacer(h=0)
 
     @property
@@ -53,7 +53,7 @@ class ClockWidget(Widget):
     _PT_MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
                   'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
 
-    def layout(self, narrow: bool = False) -> Node:
+    def layout(self) -> Node:
         now = datetime.now()
         left = f'{greeting(now)} {now.strftime("%H:%M")}'
         date_str = f'{self._PT_DAYS[now.weekday()]} {now.day} {self._PT_MONTHS[now.month - 1]}'
@@ -75,17 +75,12 @@ class ClockWidget(Widget):
                 icon = Icon.wmo(cur.get('weather_code', -1))
                 temp = cur.get('temperature_2m', '?')
                 center = f'{icon} {temp:.0f}°C' if isinstance(temp, (int, float)) else f'{icon} {temp}°C'
-        if narrow:
-            # Drop center weather to save space; append to left if available
-            if center:
-                left = f'{now.strftime("%H:%M")} {center}'
-            return HeaderBar(left=left, right=date_str)
         return HeaderBar(left=left, center=center, right=date_str)
 
 
 # ── Weather ───────────────────────────────────────────────────────
 class WeatherWidget(Widget):
-    def layout(self, narrow: bool = False) -> Node:
+    def layout(self) -> Node:
         lat = self.cfg.get('latitude', 41.54)
         lon = self.cfg.get('longitude', -8.41)
         label = self.cfg.get('label', 'Meteorologia')
@@ -106,18 +101,12 @@ class WeatherWidget(Widget):
         humidity = cur.get('relative_humidity_2m', '?')
         wind = cur.get('wind_speed_10m', '?')
         icon = Icon.wmo(cur.get('weather_code', -1))
-        if narrow:
-            children: list[Node] = [
+        children: list[Node] = [
+            Row([
                 Text(f'{icon} {temp}°C', size=FONT_LG, bold=True),
-                Text(f'{Icon.W_HUMID}{humidity}% {Icon.W_WIND}{wind}km/h', size=FONT_SM),
-            ]
-        else:
-            children = [
-                Row([
-                    Text(f'{icon} {temp}°C', size=FONT_LG, bold=True),
-                    Text(f'{Icon.W_HUMID}{humidity}% {Icon.W_WIND}{wind}km/h', size=FONT_MD, align='right'),
-                ]),
-            ]
+                Text(f'{Icon.W_HUMID}{humidity}% {Icon.W_WIND}{wind}km/h', size=FONT_MD, align='right'),
+            ]),
+        ]
         daily = data.get('daily', {})
         highs = daily.get('temperature_2m_max', [])
         lows = daily.get('temperature_2m_min', [])
@@ -137,33 +126,32 @@ class SystemWidget(Widget):
         super().__init__(cfg, cache)
         self._cpu = CpuUsage()
 
-    def layout(self, narrow: bool = False) -> Node:
+    def layout(self) -> Node:
         cpu_pct = self._cpu.read()
         temp = cpu_temp()
         mu, mt, _ = mem_info()
         du, dt, _ = disk_info(self.cfg.get('mount', '/'))
         up = uptime()
-        items = [
-            Text(f'{Icon.CPU} {cpu_pct} {temp}', size=FONT_SM),
-            Text(f'{Icon.RAM} {mu}/{mt}', size=FONT_SM),
-            Text(f'{Icon.DISK} {du}/{dt}', size=FONT_SM),
-            Text(f'{Icon.CLOCK} {up}', size=FONT_SM),
-        ]
-        if narrow:
-            children = items
-        else:
-            children = [Row(items[:2]), Row(items[2:])]
-        return Section('Sistema', icon=Icon.MONITOR, children=children)
+        return Section('Sistema', icon=Icon.MONITOR, children=[
+            Row([
+                Text(f'{Icon.CPU} {cpu_pct} {temp}', size=FONT_SM),
+                Text(f'{Icon.RAM} {mu}/{mt}', size=FONT_SM),
+            ]),
+            Row([
+                Text(f'{Icon.DISK} {du}/{dt}', size=FONT_SM),
+                Text(f'{Icon.CLOCK} {up}', size=FONT_SM),
+            ]),
+        ])
 
 
 # ── Services ──────────────────────────────────────────────────────
 class ServicesWidget(Widget):
-    def layout(self, narrow: bool = False) -> Node:
+    def layout(self) -> Node:
         label = self.cfg.get('label', 'Serviços')
         items = self.cfg.get('items', [])
         if not items:
             return Section(label, icon=Icon.SERVER, children=[Text('Sem serviços', size=FONT_SM)])
-        cols = 2 if narrow else self.cfg.get('columns', 3)
+        cols = self.cfg.get('columns', 3)
         dots: list[Node] = []
         for svc in items:
             name = svc.get('name', '?')
@@ -186,7 +174,7 @@ class NotificationsWidget(Widget):
         self.scroll = 0
         self.store: Store | None = None  # set by _build_pages
 
-    def layout(self, narrow: bool = False) -> Node:
+    def layout(self) -> Node:
         children: list[Node] = []
         if not self.store or not self.store.items:
             children.append(Text(empty_notifications(), size=FONT_MD))
@@ -216,7 +204,7 @@ class _ApiListWidget(Widget):
     def _render_items(self, data: list) -> list[Node]:
         raise NotImplementedError
 
-    def layout(self, narrow: bool = False) -> Node:
+    def layout(self) -> Node:
         url = self.cfg.get('url', '')
         key = self.cfg.get('api_key', '')
         if not url or not key:
@@ -231,7 +219,7 @@ class _ApiListWidget(Widget):
 
 
 class NowPlayingWidget(Widget):
-    def layout(self, narrow: bool = False) -> Node:
+    def layout(self) -> Node:
         url = self.cfg.get('url', '')
         key = self.cfg.get('api_key', '')
         if not url or not key:
@@ -314,7 +302,7 @@ class RadarrWidget(_ApiListWidget):
 
 # ── Infrastructure widgets ────────────────────────────────────────
 class ProxmoxWidget(Widget):
-    def layout(self, narrow: bool = False) -> Node:
+    def layout(self) -> Node:
         url = self.cfg.get('url', '')
         node = self.cfg.get('node', '')
         user = self.cfg.get('username', '')
@@ -351,7 +339,7 @@ class ProxmoxWidget(Widget):
 
 
 class HomeAssistantWidget(Widget):
-    def layout(self, narrow: bool = False) -> Node:
+    def layout(self) -> Node:
         url = self.cfg.get('url', '')
         token = self.cfg.get('token', '')
         entities = self.cfg.get('entities', [])
@@ -385,7 +373,7 @@ class ClusterWidget(Widget):
             lambda: prom_query(url, expr),
         )
 
-    def layout(self, narrow: bool = False) -> Node:
+    def layout(self) -> Node:
         grafana_url = self.cfg.get('grafana_url', '')
         badge = ''
         if grafana_url:
