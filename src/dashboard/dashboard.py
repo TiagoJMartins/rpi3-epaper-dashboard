@@ -297,7 +297,7 @@ class Handler(BaseHTTPRequestHandler):
 # ── Main ──────────────────────────────────────────────────────────
 def main() -> None:  # pragma: no cover
     parser = argparse.ArgumentParser(description="E-Paper Widget Dashboard")
-    parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--port", type=int, default=80)
     parser.add_argument("--mock", action="store_true", help="Save PNGs instead of driving display")
     parser.add_argument("--data-dir", type=Path, default=Path.home() / ".dashboard")
     parser.add_argument("--config", type=Path, default=None, help="Config YAML path")
